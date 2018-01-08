@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package prizem.api.v1;
+
+option go_package = "proto";
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+import "attributes.proto";
+
+option (gogoproto.goproto_getters_all) = false;
+option (gogoproto.equal_all) = false;
+option (gogoproto.gostring_all) = false;
+
+service EndpointDiscovery {
+  rpc GetEndpoints(EndpointsRequest) returns (EndpointsCatalog) {}
+  rpc StreamEndpoints(stream EndpointsRequest) returns (stream EndpointsCatalog) {}
+}
+
+message EndpointsRequest {
+  string node_id = 1 [(gogoproto.customname) = "NodeID"];
+  int64 version = 2;
+}
+
+message EndpointsCatalog {
+  bool use_cache = 1;
+  int64 version = 2;
+  repeated Node nodes = 3 [(gogoproto.nullable) = false];
+}
+
+message Node {
+  string id = 1 [(gogoproto.customname) = "ID"];
+  string geography = 2;
+  string datacenter = 3;
+  string address = 4;
+  Attributes metadata = 5 [(gogoproto.nullable) = false];
+  repeated ServiceInstance services = 6 [(gogoproto.nullable) = false];
+}
+
+message ServiceInstance {
+  string id = 1 [(gogoproto.customname) = "ID"];
+  string service = 2;
+  string name = 3;
+  string namespace = 4;
+  string principal = 5;
+  string owner = 6;
+  Container container = 7;
+  repeated Port ports = 8 [(gogoproto.nullable) = false];
+  Attributes metadata = 9 [(gogoproto.nullable) = false];
+  repeated string labels = 10;
+}
+
+message Container {
+  string name = 1;
+  string image = 2;
+}
+
+message Port {
+  int32 port = 1;
+  string protocol = 2;
+  bool secure = 3;
+}

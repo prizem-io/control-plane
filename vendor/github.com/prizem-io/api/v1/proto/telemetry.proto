@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package prizem.api.v1;
+
+option go_package = "proto";
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+import "attributes.proto";
+
+option (gogoproto.goproto_getters_all) = false;
+option (gogoproto.equal_all) = false;
+option (gogoproto.gostring_all) = false;
+
+service TelemetryReporter {
+  rpc Report(TelemetryReport) returns (TelemetryResponse) {
+  }
+}
+
+message TelemetryReport {
+  repeated Attributes attributes = 1 [(gogoproto.nullable) = false];
+}
+
+message TelemetryResponse {
+
+}

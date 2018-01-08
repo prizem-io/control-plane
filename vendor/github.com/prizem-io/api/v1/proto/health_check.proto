@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package prizem.api.v1;
+
+option go_package = "proto";
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.goproto_getters_all) = false;
+option (gogoproto.equal_all) = false;
+option (gogoproto.gostring_all) = false;
+
+service HealthCheckReporter {
+	rpc StreamHealthCheck(HeathRequest) returns (HealthAssignments) {
+	}
+}
+
+message HeathRequest {
+  oneof health_request {
+    HeathInitialization initialization = 1;
+    HealthStatus status = 2;
+  }
+}
+
+message HeathInitialization {
+  string node_id = 1;
+}
+
+message HealthStatus {
+	string node_id = 1 [(gogoproto.customname) = "NodeID"];
+	string service = 2;
+	enum Result {
+		UNKNOWN = 0;
+		HEALTHY = 1;
+		UNHEALTH = 2;
+	}
+	Result status = 3;
+}
+
+message HealthAssignments {
+  repeated HealthAssignment assignments = 1 [(gogoproto.nullable) = false];
+}
+
+message HealthAssignment {
+  string node_id = 1 [(gogoproto.customname) = "NodeID"];
+	string service = 2;
+}

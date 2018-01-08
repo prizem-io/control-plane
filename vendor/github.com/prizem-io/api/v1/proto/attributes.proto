@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+package prizem.api.v1;
+
+option go_package = "proto";
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+option (gogoproto.goproto_getters_all) = false;
+option (gogoproto.equal_all) = false;
+option (gogoproto.gostring_all) = false;
+
+message Attributes {
+  // The message-level dictionary.
+  repeated string words = 1;
+
+  // Attribute payload. All `sint32` values represent indices into
+  // one of the word dictionaries. Positive values are indices into the
+  // global deployment-wide dictionary, negative values are indices into
+  // the message-level dictionary.
+  map<sint32, sint32> strings = 2;
+  map<sint32, StringList> string_list = 3 [(gogoproto.nullable) = false];
+
+  map<sint32, int64> int64s = 4;
+  map<sint32, Int64List> int64_list = 5 [(gogoproto.nullable) = false];
+
+  map<sint32, double> doubles = 6;
+  map<sint32, DoubleList> double_list = 7 [(gogoproto.nullable) = false];
+
+  map<sint32, bool> bools = 8;
+  map<sint32, BoolList> bool_list = 9 [(gogoproto.nullable) = false];
+
+  map<sint32, google.protobuf.Timestamp> timestamps = 10 [(gogoproto.nullable) = false, (gogoproto.stdtime) = true];
+  map<sint32, TimestampList> timestamp_list = 11 [(gogoproto.nullable) = false];
+
+  map<sint32, google.protobuf.Duration> durations = 12 [(gogoproto.nullable) = false, (gogoproto.stdduration) = true];
+  map<sint32, DurationList> duration_list = 13 [(gogoproto.nullable) = false];
+
+  map<sint32, bytes> bytes = 14;
+  map<sint32, Attributes> attributes = 15 [(gogoproto.nullable) = false];
+}
+
+message StringList {
+  repeated sint32 items = 1;
+}
+
+message Int64List {
+  repeated int64 items = 1;
+}
+
+message DoubleList {
+  repeated double items = 1;
+}
+
+message BoolList {
+  repeated bool items = 1;
+}
+
+message TimestampList {
+  repeated google.protobuf.Timestamp items = 1 [(gogoproto.nullable) = false, (gogoproto.stdtime) = true];
+}
+
+message DurationList {
+  repeated google.protobuf.Duration items = 1 [(gogoproto.nullable) = false, (gogoproto.stdduration) = true];
+}

@@ -1,0 +1,81 @@
+syntax = "proto3";
+
+package prizem.api.v1;
+
+option go_package = "proto";
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+import "google/protobuf/duration.proto";
+import "attributes.proto";
+
+option (gogoproto.goproto_getters_all) = false;
+option (gogoproto.equal_all) = false;
+option (gogoproto.gostring_all) = false;
+
+service RouteDiscovery {
+  rpc GetRoutes(RoutesRequest) returns (RoutesCatalog) {}
+  rpc StreamRoutes(stream RoutesRequest) returns (stream RoutesCatalog) {}
+}
+
+message RoutesRequest {
+  string node_id = 1 [(gogoproto.customname) = "NodeID"];
+  int64 version = 2;
+}
+
+message RoutesCatalog {
+  bool use_cache = 1;
+  int64 version = 2;
+  repeated Service services = 3 [(gogoproto.nullable) = false];
+}
+
+message Service {
+  string name = 1;
+  string namespace = 2;
+  string description = 3;
+  string hostname = 4;
+  string uri_prefix = 5 [(gogoproto.customname) = "URIPrefix"];
+  Version version = 6;
+  string authentication = 7;
+  RoutingRules routing_rules = 8 [(gogoproto.nullable) = false];
+  repeated Operation operations = 9 [(gogoproto.nullable) = false];
+  HealthCheck health_check = 10;
+}
+
+message Operation {
+  string name = 1;
+  string method = 2;
+  string uri_pattern = 3 [(gogoproto.customname) = "URIPattern"];
+  RoutingRules routing_rules = 4 [(gogoproto.nullable) = false];
+}
+
+message RoutingRules {
+  repeated string selectors = 1;
+  repeated Configuration rewrite_rules = 2 [(gogoproto.nullable) = false];
+  google.protobuf.Duration timeout = 3 [(gogoproto.stdduration) = true];
+  Retry retry = 4;
+  repeated Configuration policies = 5 [(gogoproto.nullable) = false];
+}
+
+message Configuration {
+  string type = 1;
+  Attributes config = 2 [(gogoproto.nullable) = false];
+}
+
+message Version {
+  repeated string version_locations = 1;
+  string default_version = 2;
+}
+
+message Retry {
+  int32 attempts = 1;
+  google.protobuf.Duration per_try_timeout = 2 [(gogoproto.nullable) = false, (gogoproto.stdduration) = true];
+}
+
+message HealthCheck {
+  google.protobuf.Duration timeout = 1 [(gogoproto.nullable) = false, (gogoproto.stdduration) = true];
+  google.protobuf.Duration interval = 2 [(gogoproto.nullable) = false, (gogoproto.stdduration) = true];
+  uint32 unhealthy_threshold = 3;
+  uint32 healthy_threshold = 4;
+  string check_type = 5;
+  Attributes check_config = 6  [(gogoproto.nullable) = false];
+}
