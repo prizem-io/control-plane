@@ -12,18 +12,21 @@ import (
 	"github.com/prizem-io/api/v1"
 	"github.com/prizem-io/api/v1/convert"
 	"github.com/prizem-io/api/v1/proto"
-	log "github.com/sirupsen/logrus"
+
+	"github.com/prizem-io/control-plane/pkg/log"
 )
 
 type Routes struct {
+	logger  log.Logger
 	service api.Routes
 
 	subscriptionsMu sync.RWMutex
 	subscriptions   map[string]proto.RouteDiscovery_StreamRoutesServer
 }
 
-func NewRoutes(service api.Routes) *Routes {
+func NewRoutes(logger log.Logger, service api.Routes) *Routes {
 	return &Routes{
+		logger:        logger,
 		service:       service,
 		subscriptions: make(map[string]proto.RouteDiscovery_StreamRoutesServer, 100),
 	}
@@ -49,7 +52,7 @@ func (s *Routes) StreamRoutes(stream proto.RouteDiscovery_StreamRoutesServer) er
 		request, err := stream.Recv()
 		if err != nil {
 			if nodeID != "" {
-				log.Debugf("Removing subscription for %s", nodeID)
+				s.logger.Debugf("Removing subscription for %s", nodeID)
 				s.subscriptionsMu.Lock()
 				delete(s.subscriptions, nodeID)
 				s.subscriptionsMu.Unlock()
@@ -61,7 +64,7 @@ func (s *Routes) StreamRoutes(stream proto.RouteDiscovery_StreamRoutesServer) er
 		}
 
 		if nodeID == "" && request.NodeID != "" {
-			log.Debugf("Adding routes subscription for %s", request.NodeID)
+			s.logger.Debugf("Adding routes subscription for %s", request.NodeID)
 			s.subscriptionsMu.Lock()
 			s.subscriptions[request.NodeID] = stream
 			s.subscriptionsMu.Unlock()
@@ -82,7 +85,7 @@ func (s *Routes) StreamRoutes(stream proto.RouteDiscovery_StreamRoutesServer) er
 }
 
 func (s *Routes) PublishRoutes(version int64, services []api.Service) error {
-	log.Debug("Publishing routes to gRPC clients")
+	s.logger.Debug("Publishing routes to gRPC clients")
 	catalog := proto.RoutesCatalog{
 		UseCache: false,
 		Version:  version,
@@ -104,10 +107,10 @@ func (s *Routes) PublishRoutes(version int64, services []api.Service) error {
 	s.subscriptionsMu.RUnlock()
 
 	for _, pair := range pairs {
-		log.Debugf("Sending routes catalog update to %s", pair.nodeID)
+		s.logger.Debugf("Sending routes catalog update to %s", pair.nodeID)
 		err := pair.stream.Send(&catalog)
 		if err != nil {
-			log.Errorf("Error sending routes catalog to client: %v", err)
+			s.logger.Errorf("Error sending routes catalog to client: %v", err)
 		}
 	}
 

@@ -12,18 +12,21 @@ import (
 	"github.com/prizem-io/api/v1"
 	"github.com/prizem-io/api/v1/convert"
 	"github.com/prizem-io/api/v1/proto"
-	log "github.com/sirupsen/logrus"
+
+	"github.com/prizem-io/control-plane/pkg/log"
 )
 
 type Endpoints struct {
+	logger  log.Logger
 	service api.Endpoints
 
 	subscriptionsMu sync.RWMutex
 	subscriptions   map[string]proto.EndpointDiscovery_StreamEndpointsServer
 }
 
-func NewEndpoints(service api.Endpoints) *Endpoints {
+func NewEndpoints(logger log.Logger, service api.Endpoints) *Endpoints {
 	return &Endpoints{
+		logger:        logger,
 		service:       service,
 		subscriptions: make(map[string]proto.EndpointDiscovery_StreamEndpointsServer, 100),
 	}
@@ -49,7 +52,7 @@ func (s *Endpoints) StreamEndpoints(stream proto.EndpointDiscovery_StreamEndpoin
 		request, err := stream.Recv()
 		if err != nil {
 			if nodeID != "" {
-				log.Debugf("Removing subscription for %s", nodeID)
+				s.logger.Debugf("Removing subscription for %s", nodeID)
 				s.subscriptionsMu.Lock()
 				delete(s.subscriptions, nodeID)
 				s.subscriptionsMu.Unlock()
@@ -61,7 +64,7 @@ func (s *Endpoints) StreamEndpoints(stream proto.EndpointDiscovery_StreamEndpoin
 		}
 
 		if nodeID == "" && request.NodeID != "" {
-			log.Debugf("Adding endpoints subscription for %s", request.NodeID)
+			s.logger.Debugf("Adding endpoints subscription for %s", request.NodeID)
 			s.subscriptionsMu.Lock()
 			s.subscriptions[request.NodeID] = stream
 			s.subscriptionsMu.Unlock()
@@ -82,7 +85,7 @@ func (s *Endpoints) StreamEndpoints(stream proto.EndpointDiscovery_StreamEndpoin
 }
 
 func (s *Endpoints) PublishEndpoints(version int64, nodes []api.Node) error {
-	log.Debug("Publishing endpoints to gRPC clients")
+	s.logger.Debug("Publishing endpoints to gRPC clients")
 	catalog := proto.EndpointsCatalog{
 		UseCache: false,
 		Version:  version,
@@ -104,10 +107,10 @@ func (s *Endpoints) PublishEndpoints(version int64, nodes []api.Node) error {
 	s.subscriptionsMu.RUnlock()
 
 	for _, pair := range pairs {
-		log.Debugf("Sending endpoints catalog update to %s", pair.nodeID)
+		s.logger.Debugf("Sending endpoints catalog update to %s", pair.nodeID)
 		err := pair.stream.Send(&catalog)
 		if err != nil {
-			log.Errorf("Error sending endpoints catalog to client: %v", err)
+			s.logger.Errorf("Error sending endpoints catalog to client: %v", err)
 		}
 	}
 
