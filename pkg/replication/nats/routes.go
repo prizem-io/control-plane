@@ -16,16 +16,18 @@ import (
 
 const routesSubject = "routes"
 
-type RoutesCallback func(version int64, services []api.Service)
+type (
+	RoutesCallback func(version int64, services []api.Service)
 
-type Routes struct {
-	serverID string
+	Routes struct {
+		serverID string
 
-	conn *nats.Conn
-	sub  *nats.Subscription
+		conn *nats.Conn
+		sub  *nats.Subscription
 
-	callbacks []RoutesCallback
-}
+		callbacks []RoutesCallback
+	}
+)
 
 func NewRoutes(serverID string, conn *nats.Conn) *Routes {
 	return &Routes{
@@ -71,7 +73,7 @@ func (r *Routes) Subscribe() error {
 			var msg pb.Message
 			err := proto.Unmarshal(m.Data, &msg)
 			if err != nil {
-				// TODO
+				log.Errorf("could not unmarshal control plane message: %v", err)
 				return
 			}
 
@@ -88,7 +90,7 @@ func (r *Routes) Subscribe() error {
 				if hasData {
 					err := proto.Unmarshal(msg.Data, &catalog)
 					if err != nil {
-						// TODO
+						log.Errorf("could not unmarshal replicate routes message: %v", err)
 					} else {
 						version = catalog.Version
 						services = convert.DecodeServices(catalog.Services)

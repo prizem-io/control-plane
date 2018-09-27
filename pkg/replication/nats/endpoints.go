@@ -71,7 +71,7 @@ func (e *Endpoints) Subscribe() error {
 			var msg pb.Message
 			err := proto.Unmarshal(m.Data, &msg)
 			if err != nil {
-				// TODO
+				log.Errorf("could not unmarshal control plane message: %v", err)
 				return
 			}
 
@@ -88,7 +88,7 @@ func (e *Endpoints) Subscribe() error {
 				if hasData {
 					err := proto.Unmarshal(msg.Data, &catalog)
 					if err != nil {
-						// TODO
+						log.Errorf("could not unmarshal replicate endpoints message: %v", err)
 					} else {
 						version = catalog.Version
 						nodes = convert.DecodeNodes(catalog.Nodes)

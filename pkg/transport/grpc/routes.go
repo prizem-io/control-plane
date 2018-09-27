@@ -89,14 +89,27 @@ func (s *Routes) PublishRoutes(version int64, services []api.Service) error {
 		Services: convert.EncodeServices(services),
 	}
 
+	type nodeIDStreamPair struct {
+		nodeID string
+		stream proto.RouteDiscovery_StreamRoutesServer
+	}
+
+	pairs := make([]nodeIDStreamPair, len(s.subscriptions))
+	var i int
 	s.subscriptionsMu.RLock()
 	for nodeID, stream := range s.subscriptions {
-		log.Debugf("Sending routes catalog update to %s", nodeID)
-		err := stream.Send(&catalog) // Is this thread-safe?
-		if err != nil {
-			// TODO
-		}
+		pairs[i] = nodeIDStreamPair{nodeID, stream}
+		i++
 	}
 	s.subscriptionsMu.RUnlock()
+
+	for _, pair := range pairs {
+		log.Debugf("Sending routes catalog update to %s", pair.nodeID)
+		err := pair.stream.Send(&catalog)
+		if err != nil {
+			log.Errorf("Error sending routes catalog to client: %v", err)
+		}
+	}
+
 	return nil
 }

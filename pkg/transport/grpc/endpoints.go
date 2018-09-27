@@ -89,11 +89,27 @@ func (s *Endpoints) PublishEndpoints(version int64, nodes []api.Node) error {
 		Nodes:    convert.EncodeNodes(nodes),
 	}
 
+	type nodeIDStreamPair struct {
+		nodeID string
+		stream proto.EndpointDiscovery_StreamEndpointsServer
+	}
+
+	pairs := make([]nodeIDStreamPair, len(s.subscriptions))
+	var i int
 	s.subscriptionsMu.RLock()
 	for nodeID, stream := range s.subscriptions {
-		log.Debugf("Sending endpoints catalog update to %s", nodeID)
-		stream.Send(&catalog) // Is this thread-safe?
+		pairs[i] = nodeIDStreamPair{nodeID, stream}
+		i++
 	}
 	s.subscriptionsMu.RUnlock()
+
+	for _, pair := range pairs {
+		log.Debugf("Sending endpoints catalog update to %s", pair.nodeID)
+		err := pair.stream.Send(&catalog)
+		if err != nil {
+			log.Errorf("Error sending endpoints catalog to client: %v", err)
+		}
+	}
+
 	return nil
 }
