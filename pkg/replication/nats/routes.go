@@ -11,7 +11,8 @@ import (
 	"github.com/prizem-io/api/v1"
 	"github.com/prizem-io/api/v1/convert"
 	pb "github.com/prizem-io/api/v1/proto"
-	log "github.com/sirupsen/logrus"
+
+	"github.com/prizem-io/control-plane/pkg/log"
 )
 
 const routesSubject = "routes"
@@ -20,6 +21,7 @@ type (
 	RoutesCallback func(version int64, services []api.Service)
 
 	Routes struct {
+		logger   log.Logger
 		serverID string
 
 		conn *nats.Conn
@@ -29,22 +31,23 @@ type (
 	}
 )
 
-func NewRoutes(serverID string, conn *nats.Conn) *Routes {
+func NewRoutes(logger log.Logger, serverID string, conn *nats.Conn) *Routes {
 	return &Routes{
+		logger:   logger,
 		serverID: serverID,
 		conn:     conn,
 	}
 }
 
 func (r *Routes) PublishRoutes(version int64, services []api.Service) error {
-	log.Debugf("Replicating routes version %d", version)
+	r.logger.Debugf("Replicating routes version %d", version)
 
 	data, err := proto.Marshal(&pb.RoutesCatalog{
 		Version:  version,
 		Services: convert.EncodeServices(services),
 	})
 	if err != nil {
-		log.Errorf("Error marshalling protobuf: %v", err)
+		r.logger.Errorf("Error marshalling protobuf: %v", err)
 	}
 	msg := pb.Message{
 		Type:     "replicate",
@@ -73,7 +76,7 @@ func (r *Routes) Subscribe() error {
 			var msg pb.Message
 			err := proto.Unmarshal(m.Data, &msg)
 			if err != nil {
-				log.Errorf("could not unmarshal control plane message: %v", err)
+				r.logger.Errorf("could not unmarshal control plane message: %v", err)
 				return
 			}
 
@@ -90,7 +93,7 @@ func (r *Routes) Subscribe() error {
 				if hasData {
 					err := proto.Unmarshal(msg.Data, &catalog)
 					if err != nil {
-						log.Errorf("could not unmarshal replicate routes message: %v", err)
+						r.logger.Errorf("could not unmarshal replicate routes message: %v", err)
 					} else {
 						version = catalog.Version
 						services = convert.DecodeServices(catalog.Services)

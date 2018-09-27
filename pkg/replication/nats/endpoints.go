@@ -11,38 +11,43 @@ import (
 	"github.com/prizem-io/api/v1"
 	"github.com/prizem-io/api/v1/convert"
 	pb "github.com/prizem-io/api/v1/proto"
-	log "github.com/sirupsen/logrus"
+
+	"github.com/prizem-io/control-plane/pkg/log"
 )
 
 const endpointsSubject = "endpoints"
 
-type EndpointsCallback func(version int64, nodes []api.Node)
+type (
+	EndpointsCallback func(version int64, nodes []api.Node)
 
-type Endpoints struct {
-	serverID string
+	Endpoints struct {
+		logger   log.Logger
+		serverID string
 
-	conn *nats.Conn
-	sub  *nats.Subscription
+		conn *nats.Conn
+		sub  *nats.Subscription
 
-	callbacks []EndpointsCallback
-}
+		callbacks []EndpointsCallback
+	}
+)
 
-func NewEndpoints(serverID string, conn *nats.Conn) *Endpoints {
+func NewEndpoints(logger log.Logger, serverID string, conn *nats.Conn) *Endpoints {
 	return &Endpoints{
+		logger:   logger,
 		serverID: serverID,
 		conn:     conn,
 	}
 }
 
 func (e *Endpoints) PublishEndpoints(version int64, nodes []api.Node) error {
-	log.Debugf("Replicating endpoints version %d", version)
+	e.logger.Debugf("Replicating endpoints version %d", version)
 
 	data, err := proto.Marshal(&pb.EndpointsCatalog{
 		Version: version,
 		Nodes:   convert.EncodeNodes(nodes),
 	})
 	if err != nil {
-		log.Errorf("Error marshalling protobuf: %v", err)
+		e.logger.Errorf("Error marshalling protobuf: %v", err)
 	}
 	msg := pb.Message{
 		Type:     "replicate",
@@ -71,7 +76,7 @@ func (e *Endpoints) Subscribe() error {
 			var msg pb.Message
 			err := proto.Unmarshal(m.Data, &msg)
 			if err != nil {
-				log.Errorf("could not unmarshal control plane message: %v", err)
+				e.logger.Errorf("could not unmarshal control plane message: %v", err)
 				return
 			}
 
@@ -88,7 +93,7 @@ func (e *Endpoints) Subscribe() error {
 				if hasData {
 					err := proto.Unmarshal(msg.Data, &catalog)
 					if err != nil {
-						log.Errorf("could not unmarshal replicate endpoints message: %v", err)
+						e.logger.Errorf("could not unmarshal replicate endpoints message: %v", err)
 					} else {
 						version = catalog.Version
 						nodes = convert.DecodeNodes(catalog.Nodes)

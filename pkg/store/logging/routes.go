@@ -6,14 +6,15 @@ package logging
 
 import (
 	"github.com/prizem-io/api/v1"
+	"github.com/prizem-io/control-plane/pkg/log"
 )
 
 type Routing struct {
 	service api.Routes
-	logger  logger
+	logger  log.Logger
 }
 
-func NewRouting(service api.Routes, logger logger) *Routing {
+func NewRouting(service api.Routes, logger log.Logger) *Routing {
 	return &Routing{
 		service: service,
 		logger:  logger,

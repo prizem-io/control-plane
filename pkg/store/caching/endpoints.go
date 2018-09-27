@@ -8,20 +8,21 @@ import (
 	"sync"
 
 	"github.com/prizem-io/api/v1"
-	log "github.com/sirupsen/logrus"
 )
 
-type EndpointsCallback func(version int64, nodes []api.Node) error
+type (
+	EndpointsCallback func(version int64, nodes []api.Node) error
 
-type Endpoints struct {
-	service api.Endpoints
+	Endpoints struct {
+		service api.Endpoints
 
-	mu      sync.RWMutex
-	version int64
-	nodes   []api.Node
+		mu      sync.RWMutex
+		version int64
+		nodes   []api.Node
 
-	callbacks []EndpointsCallback
-}
+		callbacks []EndpointsCallback
+	}
+)
 
 func NewEndpoints(service api.Endpoints) *Endpoints {
 	return &Endpoints{
@@ -90,7 +91,7 @@ func (e *Endpoints) RemoveEndpoints(nodeID string, serviceNames ...string) (modi
 func (e *Endpoints) publishNewEndpoints() {
 	nodes, version, _, err := e.GetEndpoints(0)
 	if err != nil {
-		log.Errorf("Error getting endpoints: %v", err)
+		return
 	}
 	for _, cb := range e.callbacks {
 		cb(version, nodes)

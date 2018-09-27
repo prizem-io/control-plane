@@ -8,20 +8,21 @@ import (
 	"sync"
 
 	"github.com/prizem-io/api/v1"
-	log "github.com/sirupsen/logrus"
 )
 
-type RoutesCallback func(version int64, nodes []api.Service) error
+type (
+	RoutesCallback func(version int64, nodes []api.Service) error
 
-type Routes struct {
-	service api.Routes
+	Routes struct {
+		service api.Routes
 
-	mu       sync.RWMutex
-	version  int64
-	services []api.Service
+		mu       sync.RWMutex
+		version  int64
+		services []api.Service
 
-	callbacks []RoutesCallback
-}
+		callbacks []RoutesCallback
+	}
+)
 
 func NewRoutes(service api.Routes) *Routes {
 	return &Routes{
@@ -80,7 +81,7 @@ func (r *Routes) RemoveService(serviceName string) (index int64, err error) {
 func (r *Routes) publishNewRoutes() {
 	services, version, _, err := r.GetServices(0)
 	if err != nil {
-		log.Errorf("Error getting routes: %v", err)
+		return
 	}
 	for _, cb := range r.callbacks {
 		cb(version, services)

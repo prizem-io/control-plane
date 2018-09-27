@@ -18,32 +18,35 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/nats-io/gnatsd/server"
 	nats "github.com/nats-io/go-nats"
-	uuid "github.com/satori/go.uuid"
-	log "github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
-
 	"github.com/prizem-io/api/v1"
 	"github.com/prizem-io/api/v1/proto"
+	uuid "github.com/satori/go.uuid"
+	"go.uber.org/zap"
+	"google.golang.org/grpc"
+
 	"github.com/prizem-io/control-plane/pkg/app"
-	"github.com/prizem-io/control-plane/pkg/middleware/caching"
-	"github.com/prizem-io/control-plane/pkg/middleware/logging"
+	"github.com/prizem-io/control-plane/pkg/log"
 	replication "github.com/prizem-io/control-plane/pkg/replication/nats"
+	"github.com/prizem-io/control-plane/pkg/store/caching"
+	"github.com/prizem-io/control-plane/pkg/store/logging"
 	"github.com/prizem-io/control-plane/pkg/store/postgres"
 	grpctransport "github.com/prizem-io/control-plane/pkg/transport/grpc"
 	resttransport "github.com/prizem-io/control-plane/pkg/transport/rest"
 )
 
 func main() {
-	logger := log.New()
-	serverID := uuid.NewV4()
+	zapLogger, _ := zap.NewProduction()
+	defer zapLogger.Sync() // flushes buffer, if any
+	sugar := zapLogger.Sugar()
+	logger := log.New(sugar)
 
-	log.SetLevel(log.DebugLevel)
+	serverID := uuid.NewV4()
 
 	// Load the application config
 	logger.Info("Loading configuration...")
 	config, err := app.LoadConfig()
 	if err != nil {
-		log.Fatalln(err)
+		logger.Fatal(err)
 	}
 
 	// Connect to database
@@ -54,7 +57,7 @@ func main() {
 		return
 	}, backoff.NewExponentialBackOff())
 	if err != nil {
-		log.Fatalln(err)
+		logger.Fatal(err)
 	}
 	defer db.Close()
 
@@ -64,16 +67,16 @@ func main() {
 	defer s.Shutdown()
 	nc, err := nats.Connect(nats.DefaultURL)
 	if err != nil {
-		log.Fatalln(err)
+		logger.Fatal(err)
 	}
 
 	store := postgres.New(db)
 
 	var routes api.Routes
-	routesReplicator := replication.NewRoutes(serverID.String(), nc)
+	routesReplicator := replication.NewRoutes(logger, serverID.String(), nc)
 	err = routesReplicator.Subscribe()
 	if err != nil {
-		log.Fatalln(err)
+		logger.Fatal(err)
 	}
 	defer routesReplicator.Unsubscribe()
 	routes = store
@@ -83,10 +86,10 @@ func main() {
 	routesReplicator.AddCallback(routesCache.SetServices)
 
 	var endpoints api.Endpoints
-	endpointsReplicator := replication.NewEndpoints(serverID.String(), nc)
+	endpointsReplicator := replication.NewEndpoints(logger, serverID.String(), nc)
 	err = endpointsReplicator.Subscribe()
 	if err != nil {
-		log.Fatalln(err)
+		logger.Fatal(err)
 	}
 	defer endpointsReplicator.Unsubscribe()
 	endpoints = store
