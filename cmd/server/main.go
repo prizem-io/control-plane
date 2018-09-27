@@ -126,11 +126,11 @@ func main() {
 		}
 		s := grpc.NewServer() //grpc.Creds(creds))
 
-		routesServer := grpctransport.NewRoutes(routesCache)
+		routesServer := grpctransport.NewRoutes(logger, routesCache)
 		routesCache.AddCallback(routesServer.PublishRoutes)
 		proto.RegisterRouteDiscoveryServer(s, routesServer)
 
-		endpointsServer := grpctransport.NewEndpoints(endpointsCache)
+		endpointsServer := grpctransport.NewEndpoints(logger, endpointsCache)
 		endpointsCache.AddCallback(endpointsServer.PublishEndpoints)
 		proto.RegisterEndpointDiscoveryServer(s, endpointsServer)
 
