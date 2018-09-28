@@ -181,6 +181,14 @@
   version = "v1.0.0"
 
 [[projects]]
+  digest = "1:9ec6cf1df5ad1d55cf41a43b6b1e7e118a91bade4f68ff4303379343e40c0e25"
+  name = "github.com/oklog/run"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "4dadeb3030eda0273a12382bb2348ffc7c9d1a39"
+  version = "v1.0.0"
+
+[[projects]]
   digest = "1:95741de3af260a92cc5c7f3f3061e85273f5a81b5db20d4bd68da74bd521675e"
   name = "github.com/pelletier/go-toml"
   packages = ["."]
@@ -210,7 +218,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:e6fe1b6b158373933132a62ff1d6a3b82aa2679ac6dd51477c9faec36e928314"
+  digest = "1:0c5356699542100e33927ae473b8f67812fce6686b798c706d67309fd2272724"
   name = "github.com/prizem-io/h2"
   packages = [
     "frames",
@@ -218,7 +226,7 @@
     "proxy",
   ]
   pruneopts = "UT"
-  revision = "c7a58d1e5e1cc175bd66265ba01775dcd230cd66"
+  revision = "b0111e52ef40eb989947ac7dfc9961c06bce2223"
 
 [[projects]]
   digest = "1:274f67cb6fed9588ea2521ecdac05a6d62a8c51c074c1fccc6a49a40ba80e925"
@@ -451,6 +459,7 @@
     "github.com/lib/pq",
     "github.com/nats-io/gnatsd/server",
     "github.com/nats-io/go-nats",
+    "github.com/oklog/run",
     "github.com/pkg/errors",
     "github.com/prizem-io/api/v1",
     "github.com/prizem-io/api/v1/convert",
