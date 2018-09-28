@@ -5,11 +5,13 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -18,6 +20,7 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/nats-io/gnatsd/server"
 	nats "github.com/nats-io/go-nats"
+	"github.com/oklog/run"
 	"github.com/prizem-io/api/v1"
 	"github.com/prizem-io/api/v1/proto"
 	uuid "github.com/satori/go.uuid"
@@ -42,6 +45,13 @@ func main() {
 
 	serverID := uuid.NewV4()
 
+	httpListenPort := readEnv("HTTP_PORT", 8000)
+	grpcListenPort := readEnv("GRPC_PORT", 9000)
+
+	flag.IntVar(&httpListenPort, "httpPort", httpListenPort, "The HTTP listening port")
+	flag.IntVar(&grpcListenPort, "grpcPort", grpcListenPort, "The gRPC listening port")
+	flag.Parse()
+
 	// Load the application config
 	logger.Info("Loading configuration...")
 	config, err := app.LoadConfig()
@@ -65,16 +75,23 @@ func main() {
 	logger.Info("Connecting to NATS...")
 	s := runNATSServer()
 	defer s.Shutdown()
-	nc, err := nats.Connect(nats.DefaultURL)
+
+	var nc *nats.Conn
+	err = backoff.Retry(func() (err error) {
+		nc, err = nats.Connect(nats.DefaultURL)
+		return
+	}, backoff.NewExponentialBackOff())
 	if err != nil {
 		logger.Fatal(err)
 	}
 
+	// Using Postgres as the backend store
 	store := postgres.New(db)
 
+	// Initialize routes service
 	var routes api.Routes
 	routesReplicator := replication.NewRoutes(logger, serverID.String(), nc)
-	err = routesReplicator.Subscribe()
+	err = backoff.Retry(routesReplicator.Subscribe, backoff.NewExponentialBackOff())
 	if err != nil {
 		logger.Fatal(err)
 	}
@@ -84,10 +101,12 @@ func main() {
 	routesCache := caching.NewRoutes(routes)
 	routesCache.AddCallback(routesReplicator.PublishRoutes)
 	routesReplicator.AddCallback(routesCache.SetServices)
+	routes = routesCache
 
+	// Initialize endpoints service
 	var endpoints api.Endpoints
 	endpointsReplicator := replication.NewEndpoints(logger, serverID.String(), nc)
-	err = endpointsReplicator.Subscribe()
+	err = backoff.Retry(endpointsReplicator.Subscribe, backoff.NewExponentialBackOff())
 	if err != nil {
 		logger.Fatal(err)
 	}
@@ -97,48 +116,73 @@ func main() {
 	endpointsCache := caching.NewEndpoints(endpoints)
 	endpointsCache.AddCallback(endpointsReplicator.PublishEndpoints)
 	endpointsReplicator.AddCallback(endpointsCache.SetEndpoints)
+	endpoints = endpointsCache
 
-	// Mechanical domain.
-	errc := make(chan error)
-
-	// Interrupt handler.
-	go func() {
-		c := make(chan os.Signal, 1)
-		signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
-		errc <- fmt.Errorf("%s", <-c)
-	}()
+	var g run.Group
 
 	// HTTP transport.
-	go func() {
-		srv := resttransport.NewServer()
-		srv.RegisterRoutes(routesCache)
-		srv.RegisterEndpoints(endpointsCache)
+	{
+		var listener net.Listener
+		g.Add(func() error {
+			var err error
+			logger.Infof("HTTP listener starting on :%d", httpListenPort)
+			listener, err = net.Listen("tcp", fmt.Sprintf(":%d", httpListenPort))
+			if err != nil {
+				return err
+			}
+			srv := resttransport.NewServer()
+			srv.RegisterRoutes(routes)
+			srv.RegisterEndpoints(endpoints)
 
-		errc <- http.ListenAndServe(":8000", srv.Handler())
-	}()
-
+			return http.Serve(listener, srv.Handler())
+		}, func(error) {
+			listener.Close()
+		})
+	}
 	// gRPC transport.
-	go func() {
-		ln, err := net.Listen("tcp", ":9000")
-		if err != nil {
-			errc <- err
-			return
-		}
-		s := grpc.NewServer() //grpc.Creds(creds))
+	{
+		var listener net.Listener
+		g.Add(func() error {
+			var err error
+			logger.Infof("gRPC listener starting on :%d", grpcListenPort)
+			listener, err = net.Listen("tcp", fmt.Sprintf(":%d", grpcListenPort))
+			if err != nil {
+				return err
+			}
+			s := grpc.NewServer() //grpc.Creds(creds))
 
-		routesServer := grpctransport.NewRoutes(logger, routesCache)
-		routesCache.AddCallback(routesServer.PublishRoutes)
-		proto.RegisterRouteDiscoveryServer(s, routesServer)
+			routesServer := grpctransport.NewRoutes(logger, routes)
+			routesCache.AddCallback(routesServer.PublishRoutes)
+			proto.RegisterRouteDiscoveryServer(s, routesServer)
 
-		endpointsServer := grpctransport.NewEndpoints(logger, endpointsCache)
-		endpointsCache.AddCallback(endpointsServer.PublishEndpoints)
-		proto.RegisterEndpointDiscoveryServer(s, endpointsServer)
+			endpointsServer := grpctransport.NewEndpoints(logger, endpoints)
+			endpointsCache.AddCallback(endpointsServer.PublishEndpoints)
+			proto.RegisterEndpointDiscoveryServer(s, endpointsServer)
 
-		errc <- s.Serve(ln)
-	}()
+			return http.Serve(listener, nil)
+		}, func(error) {
+			listener.Close()
+		})
+	}
+	// This function just sits and waits for ctrl-C.
+	{
+		cancelInterrupt := make(chan struct{})
+		g.Add(func() error {
+			c := make(chan os.Signal, 1)
+			signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+			select {
+			case sig := <-c:
+				return fmt.Errorf("received signal %s", sig)
+			case <-cancelInterrupt:
+				return nil
+			}
+		}, func(error) {
+			close(cancelInterrupt)
+		})
+	}
 
 	logger.Info("Control plane started")
-	<-errc
+	logger.Infof("exit %v", g.Run())
 }
 
 // runNATSServer starts a new Go routine based NATS server
@@ -167,4 +211,11 @@ func runNATSServer() *server.Server {
 		panic("Unable to start NATS Server in Go Routine")
 	}
 	return s
+}
+
+func readEnv(key string, defaultValue int) int {
+	if i, err := strconv.Atoi(os.Getenv(key)); err == nil {
+		return i
+	}
+	return defaultValue
 }
