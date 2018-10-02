@@ -47,9 +47,11 @@ func main() {
 
 	httpListenPort := readEnv("HTTP_PORT", 8000)
 	grpcListenPort := readEnv("GRPC_PORT", 9000)
+	var disableEmbeddedNATS bool
 
 	flag.IntVar(&httpListenPort, "httpPort", httpListenPort, "The HTTP listening port")
 	flag.IntVar(&grpcListenPort, "grpcPort", grpcListenPort, "The gRPC listening port")
+	flag.BoolVar(&disableEmbeddedNATS, "disableEmbeddedNATS", false, "Disable running NATS as an embedded server")
 	flag.Parse()
 
 	// Load the application config
@@ -59,13 +61,18 @@ func main() {
 		logger.Fatal(err)
 	}
 
+	eb := backoff.NewExponentialBackOff()
+	notify := func(err error, d time.Duration) {
+		logger.Errorf("Failed attempt: %v -> will retry in %s", err, d)
+	}
+
 	// Connect to database
 	logger.Info("Connecting to database...")
 	var db *sqlx.DB
-	err = backoff.Retry(func() (err error) {
+	err = backoff.RetryNotify(func() (err error) {
 		db, err = app.ConnectDB(&config.Database)
 		return
-	}, backoff.NewExponentialBackOff())
+	}, eb, notify)
 	if err != nil {
 		logger.Fatal(err)
 	}
@@ -73,14 +80,17 @@ func main() {
 
 	// Connect to NATS
 	logger.Info("Connecting to NATS...")
-	s := runNATSServer()
-	defer s.Shutdown()
+	if !disableEmbeddedNATS {
+		s := runNATSServer()
+		defer s.Shutdown()
+	}
 
 	var nc *nats.Conn
-	err = backoff.Retry(func() (err error) {
+	eb.Reset()
+	err = backoff.RetryNotify(func() (err error) {
 		nc, err = nats.Connect(nats.DefaultURL)
 		return
-	}, backoff.NewExponentialBackOff())
+	}, eb, notify)
 	if err != nil {
 		logger.Fatal(err)
 	}
@@ -89,9 +99,10 @@ func main() {
 	store := postgres.New(db)
 
 	// Initialize routes service
+	eb.Reset()
 	var routes api.Routes
 	routesReplicator := replication.NewRoutes(logger, serverID.String(), nc)
-	err = backoff.Retry(routesReplicator.Subscribe, backoff.NewExponentialBackOff())
+	err = backoff.RetryNotify(routesReplicator.Subscribe, eb, notify)
 	if err != nil {
 		logger.Fatal(err)
 	}
@@ -104,9 +115,10 @@ func main() {
 	routes = routesCache
 
 	// Initialize endpoints service
+	eb.Reset()
 	var endpoints api.Endpoints
 	endpointsReplicator := replication.NewEndpoints(logger, serverID.String(), nc)
-	err = backoff.Retry(endpointsReplicator.Subscribe, backoff.NewExponentialBackOff())
+	err = backoff.RetryNotify(endpointsReplicator.Subscribe, eb, notify)
 	if err != nil {
 		logger.Fatal(err)
 	}
@@ -136,7 +148,9 @@ func main() {
 
 			return http.Serve(listener, srv.Handler())
 		}, func(error) {
-			listener.Close()
+			if listener != nil {
+				listener.Close()
+			}
 		})
 	}
 	// gRPC transport.
@@ -149,7 +163,7 @@ func main() {
 			if err != nil {
 				return err
 			}
-			s := grpc.NewServer() //grpc.Creds(creds))
+			s := grpc.NewServer()
 
 			routesServer := grpctransport.NewRoutes(logger, routes)
 			routesCache.AddCallback(routesServer.PublishRoutes)
@@ -159,9 +173,11 @@ func main() {
 			endpointsCache.AddCallback(endpointsServer.PublishEndpoints)
 			proto.RegisterEndpointDiscoveryServer(s, endpointsServer)
 
-			return http.Serve(listener, nil)
+			return s.Serve(listener)
 		}, func(error) {
-			listener.Close()
+			if listener != nil {
+				listener.Close()
+			}
 		})
 	}
 	// This function just sits and waits for ctrl-C.
