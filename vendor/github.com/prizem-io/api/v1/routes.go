@@ -6,8 +6,6 @@ package api
 
 import (
 	"time"
-
-	"github.com/prizem-io/h2/proxy"
 )
 
 type (
@@ -51,12 +49,12 @@ type (
 
 	// RoutingRules defines the selectors, rewrite rules, retry behavior, and policies for a service or operation.
 	RoutingRules struct {
-		Selectors    []string           `json:"selectors,omitempty"`
-		RewriteRules []Configuration    `json:"rewriteRules,omitempty"`
-		Timeout      *Duration          `json:"timeout,omitempty"`
-		Retry        *Retry             `json:"retry,omitempty"`
-		Policies     []Configuration    `json:"policies,omitempty"`
-		Middleware   []proxy.Middleware `json:"-"`
+		Selectors    []string        `json:"selectors,omitempty"`
+		RewriteRules []Configuration `json:"rewriteRules,omitempty"`
+		Timeout      *Duration       `json:"timeout,omitempty"`
+		Retry        *Retry          `json:"retry,omitempty"`
+		Policies     []Configuration `json:"policies,omitempty"`
+		Middleware   interface{}     `json:"-"`
 	}
 
 	// Configuration defines loadable parameters for a given middleware type.
