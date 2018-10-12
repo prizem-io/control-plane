@@ -72,7 +72,7 @@ type (
 	// Retry defines retry behavior rule.
 	Retry struct {
 		Attempts           int      `json:"attempts"`
-		ResponseClassifier string   `json:"responseClassifier"`
+		ResponseClassifier string   `json:"responseClassifier,omitempty"`
 		PerTryTimeout      Duration `json:"perTryTimeout"`
 	}
 
