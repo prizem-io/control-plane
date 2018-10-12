@@ -68,7 +68,8 @@ message Version {
 
 message Retry {
   int32 attempts = 1;
-  google.protobuf.Duration per_try_timeout = 2 [(gogoproto.nullable) = false, (gogoproto.stdduration) = true];
+  string responseClassifier = 2;
+  google.protobuf.Duration per_try_timeout = 3 [(gogoproto.nullable) = false, (gogoproto.stdduration) = true];
 }
 
 message HealthCheck {

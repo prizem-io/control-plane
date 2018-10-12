@@ -78,8 +78,9 @@ func EncodeRetry(retry *api.Retry) *proto.Retry {
 	}
 
 	return &proto.Retry{
-		Attempts:      int32(retry.Attempts),
-		PerTryTimeout: time.Duration(retry.PerTryTimeout),
+		Attempts:           int32(retry.Attempts),
+		ResponseClassifier: retry.ResponseClassifier,
+		PerTryTimeout:      time.Duration(retry.PerTryTimeout),
 	}
 }
 

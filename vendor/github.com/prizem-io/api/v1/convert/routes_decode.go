@@ -76,8 +76,9 @@ func DecodeRetry(retry *proto.Retry) *api.Retry {
 	}
 
 	return &api.Retry{
-		Attempts:      int(retry.Attempts),
-		PerTryTimeout: api.Duration(retry.PerTryTimeout),
+		Attempts:           int(retry.Attempts),
+		ResponseClassifier: retry.ResponseClassifier,
+		PerTryTimeout:      api.Duration(retry.PerTryTimeout),
 	}
 }
 

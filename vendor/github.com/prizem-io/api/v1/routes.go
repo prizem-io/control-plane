@@ -71,8 +71,9 @@ type (
 
 	// Retry defines retry behavior rule.
 	Retry struct {
-		Attempts      int      `json:"attempts"`
-		PerTryTimeout Duration `json:"perTryTimeout"`
+		Attempts           int      `json:"attempts"`
+		ResponseClassifier string   `json:"responseClassifier"`
+		PerTryTimeout      Duration `json:"perTryTimeout"`
 	}
 
 	// HealthCheck defines the health check behavior.

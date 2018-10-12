@@ -9,7 +9,6 @@
 		endpoints.proto
 		health_check.proto
 		message.proto
-		metrics.proto
 		routes.proto
 		telemetry.proto
 
@@ -33,8 +32,6 @@
 		HealthAssignments
 		HealthAssignment
 		Message
-		StreamMetricsMessage
-		StreamMetricsResponse
 		RoutesRequest
 		RoutesCatalog
 		Service
