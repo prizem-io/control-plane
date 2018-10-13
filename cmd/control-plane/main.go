@@ -45,13 +45,13 @@ func main() {
 
 	serverID := uuid.NewV4()
 
-	httpListenPort := readEnv("HTTP_PORT", 8000)
-	grpcListenPort := readEnv("GRPC_PORT", 9000)
-	var disableEmbeddedNATS bool
+	httpListenPort := readEnvInt("HTTP_PORT", 8000)
+	grpcListenPort := readEnvInt("GRPC_PORT", 9000)
+	disableEmbeddedNATS := readEnvBool("DISABLE_EMBEDDED_NATS", false)
 
 	flag.IntVar(&httpListenPort, "httpPort", httpListenPort, "The HTTP listening port")
 	flag.IntVar(&grpcListenPort, "grpcPort", grpcListenPort, "The gRPC listening port")
-	flag.BoolVar(&disableEmbeddedNATS, "disableEmbeddedNATS", false, "Disable running NATS as an embedded server")
+	flag.BoolVar(&disableEmbeddedNATS, "disableEmbeddedNATS", disableEmbeddedNATS, "Disable running NATS as an embedded server")
 	flag.Parse()
 
 	// Load the application config
@@ -229,8 +229,15 @@ func runNATSServer() *server.Server {
 	return s
 }
 
-func readEnv(key string, defaultValue int) int {
+func readEnvInt(key string, defaultValue int) int {
 	if i, err := strconv.Atoi(os.Getenv(key)); err == nil {
+		return i
+	}
+	return defaultValue
+}
+
+func readEnvBool(key string, defaultValue bool) bool {
+	if i, err := strconv.ParseBool(os.Getenv(key)); err == nil {
 		return i
 	}
 	return defaultValue
