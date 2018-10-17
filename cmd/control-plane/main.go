@@ -63,7 +63,7 @@ func main() {
 
 	eb := backoff.NewExponentialBackOff()
 	notify := func(err error, d time.Duration) {
-		logger.Errorf("Failed attempt: %v -> will retry in %s", err, d)
+		logger.Infof("Failed attempt: %v -> will retry in %s", err, d)
 	}
 
 	// Connect to database
