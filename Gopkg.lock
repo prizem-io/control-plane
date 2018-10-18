@@ -178,7 +178,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:9527bc4560bfcb8903eed490a8ac766b9cefa3b3e030513e65b62b1c1b86d812"
+  digest = "1:102f5aed35a5537debafb9d72bf2da59c39b806700818a3d2cae26dd69c79ff0"
   name = "github.com/prizem-io/api"
   packages = [
     "v1",
@@ -186,7 +186,7 @@
     "v1/proto",
   ]
   pruneopts = "UT"
-  revision = "90b6856394141dd35340e54b64943cf840ec291d"
+  revision = "dfbecc702d107142c92f24925c592853660e5fbe"
 
 [[projects]]
   digest = "1:274f67cb6fed9588ea2521ecdac05a6d62a8c51c074c1fccc6a49a40ba80e925"

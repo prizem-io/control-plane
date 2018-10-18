@@ -11,7 +11,7 @@ option (gogoproto.equal_all) = false;
 option (gogoproto.gostring_all) = false;
 
 service HealthCheckReporter {
-	rpc StreamHealthCheck(HeathRequest) returns (HealthAssignments) {
+	rpc Report(stream HeathRequest) returns (stream HealthAssignments) {
 	}
 }
 
@@ -23,7 +23,7 @@ message HeathRequest {
 }
 
 message HeathInitialization {
-  string node_id = 1;
+  string node_id = 1 [(gogoproto.customname) = "NodeID"];
 }
 
 message HealthStatus {

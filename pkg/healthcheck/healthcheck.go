@@ -25,7 +25,7 @@ type Service struct {
 	nodes unsafe.Pointer
 
 	mu      sync.Mutex
-	streams map[string]proto.HealthCheckReporter_StreamHealthCheckServer
+	streams map[string]proto.HealthCheckReporter_ReportServer
 }
 
 type message struct {
@@ -62,7 +62,7 @@ func (s *Service) Subscribe() error {
 	return err
 }
 
-func (s *Service) StreamHealthCheck(stream proto.HealthCheckReporter_StreamHealthCheckServer) error {
+func (s *Service) StreamHealthCheck(stream proto.HealthCheckReporter_ReportServer) error {
 	var nodeID string
 	defer func() {
 		if nodeID != "" {
@@ -87,19 +87,19 @@ func (s *Service) StreamHealthCheck(stream proto.HealthCheckReporter_StreamHealt
 				continue
 			}
 
-			nodeID = v.Initialization.NodeId
+			nodeID = v.Initialization.NodeID
 			s.mu.Lock()
 			s.streams[nodeID] = stream
 			s.mu.Unlock()
 
 			s.sendAssignments(nodeID, stream)
 		case *proto.HeathRequest_Status:
-
+			// TODO
 		}
 	}
 }
 
-func (s *Service) sendAssignments(nodeID string, stream proto.HealthCheckReporter_StreamHealthCheckServer) error {
+func (s *Service) sendAssignments(nodeID string, stream proto.HealthCheckReporter_ReportServer) error {
 	ptr := atomic.LoadPointer(&s.nodes)
 	nodes := *(*[]api.Node)(ptr)
 
@@ -108,6 +108,7 @@ func (s *Service) sendAssignments(nodeID string, stream proto.HealthCheckReporte
 		return err
 	}
 
+	// TODO evenly spread assignments across nodes.
 	for _, n := range nodes {
 		if n.ID == nodeUUID {
 			assignments := make([]proto.HealthAssignment, len(n.Services))
