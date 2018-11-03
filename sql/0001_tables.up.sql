@@ -28,3 +28,10 @@ CREATE TABLE IF NOT EXISTS service (
 
 INSERT INTO source VALUES ('endpoints', 0);
 INSERT INTO source VALUES ('routing', 0);
+
+CREATE TABLE IF NOT EXISTS cp_node (
+    node_id UUID NOT NULL PRIMARY KEY,
+    geography VARCHAR(128) NOT NULL,
+    datacenter VARCHAR(128) NOT NULL,
+    address VARCHAR(128) NOT NULL
+);

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strconv"
@@ -36,6 +37,13 @@ import (
 	grpctransport "github.com/prizem-io/control-plane/pkg/transport/grpc"
 	resttransport "github.com/prizem-io/control-plane/pkg/transport/rest"
 )
+
+type ControlPlaneNode struct {
+	NodeID     uuid.UUID `db:"node_id"`
+	Geography  string    `db:"geography"`
+	Datacenter string    `db:"datacenter"`
+	Address    string    `db:"address"`
+}
 
 func main() {
 	zapLogger, _ := zap.NewProduction()
@@ -78,12 +86,28 @@ func main() {
 	}
 	defer db.Close()
 
+	var controlPlaneNodes []ControlPlaneNode
+	db.Select(&controlPlaneNodes, "SELECT node_id, geography, datacenter, address FROM cp_node")
+
 	// Connect to NATS
 	logger.Info("Connecting to NATS...")
 	if !disableEmbeddedNATS {
-		s := runNATSServer()
+		s := runNATSServer(controlPlaneNodes)
 		defer s.Shutdown()
 	}
+
+	// TODO: pass in geography and datacenter
+	_, err = db.Exec("INSERT INTO cp_node (node_id, geography, datacenter, address) VALUES ($1, $2, $3, $4)", serverID, "blah", "blah", fmt.Sprintf("%s:%d", getLocalIP(), 4248))
+	if err != nil {
+		logger.Fatal(err)
+	}
+
+	defer func() {
+		_, err := db.Exec("DELETE FROM cp_node WHERE node_id = $1", serverID)
+		if err != nil {
+			logger.Warn("Could not remove control plane node from database")
+		}
+	}()
 
 	var nc *nats.Conn
 	eb.Reset()
@@ -202,18 +226,29 @@ func main() {
 }
 
 // runNATSServer starts a new Go routine based NATS server
-func runNATSServer() *server.Server {
+func runNATSServer(controlPlaneNodes []ControlPlaneNode) *server.Server {
+	routeURLs := make([]*url.URL, len(controlPlaneNodes))
+	for i := range controlPlaneNodes {
+		routeURLs[i] = &url.URL{
+			Scheme: "nats-route",
+			Host:   controlPlaneNodes[i].Address,
+		}
+	}
+
 	s := server.New(&server.Options{
 		Port:           4222,
 		NoLog:          true,
 		NoSigs:         true,
 		MaxControlLine: 256,
+		Routes:         routeURLs,
 		Cluster: server.ClusterOpts{
 			Username: "foo",
 			Password: "bar",
 			Port:     4248,
+			// TODO - TLS Config
 		},
 		HTTPPort: 8222,
+		// TODO - TLS Config
 	})
 	if s == nil {
 		panic("No NATS Server object returned.")
@@ -241,4 +276,21 @@ func readEnvBool(key string, defaultValue bool) bool {
 		return i
 	}
 	return defaultValue
+}
+
+// getLocalIP returns the non loopback local IP of the host
+func getLocalIP() string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return ""
+	}
+	for _, address := range addrs {
+		// check the address type and if it is not a loopback the display it
+		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				return ipnet.IP.String()
+			}
+		}
+	}
+	return ""
 }
